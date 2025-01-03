@@ -1,0 +1,4 @@
+aiogram
+datetime
+psycopg2
+dotenv
