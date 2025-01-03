@@ -1,4 +1,5 @@
-aiogram
-datetime
-psycopg2
-dotenv
+asyncpg~=0.25.0
+aiogram~=2.25.2
+python-dotenv~=1.0.1
+DateTime~=5.5
+aiocron~=1.8
