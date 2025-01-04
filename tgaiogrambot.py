@@ -14,7 +14,7 @@ from functools import wraps
 from datetime import datetime
 import random
 import aiocron
-
+from sympy.abc import lamda
 
 # Configure logging
 logging.basicConfig(
@@ -168,7 +168,7 @@ def subscription_required(handler):
             return await handler(message, *args, **kwargs)
         else:
             markup = InlineKeyboardMarkup()
-            markup.row(
+            markup.add(
                 InlineKeyboardButton('Mem1no', url='https://t.me/MeminoMem'),
                 InlineKeyboardButton('\u2705 Проверить подписку', callback_data='check_subscription')
             )
@@ -180,6 +180,7 @@ async def check_subscription_handler(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     if await is_subscribed(user_id):
         await callback_query.answer("Вы подписаны!", show_alert=True)
+        await privetsvie(callback_query.message)
     else:
         await callback_query.answer("Пожалуйста что б бот работал подпишитесь на каналы.", show_alert=True)
 
@@ -365,7 +366,6 @@ async def handle_menu_selection(message: types.Message):
 async def privetsvie(message: types.Message):
     await send_message(message, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
     await show_menu(message)
-
 
 
 @dp.message_handler(commands=["video"])
