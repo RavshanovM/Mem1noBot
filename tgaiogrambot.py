@@ -339,6 +339,12 @@ async def show_menu(message: types.Message):
     )
     await message.reply("Выберите категорию:", reply_markup=menu_keyboard)
 
+@dp.message_handler(commands=['start'])
+@subscription_required
+async def privetsvie(message: types.Message):
+    await bot.send_message(message.chat.id, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
+
+
 
 @dp.message_handler(lambda message: message.text in ['🎥 Видео', '🖼️ Мемы', '📦 Стикеры', '🎙️ Голосовухи', '🍀 Узнать уровень удачи'])
 async def handle_menu_selection(message: types.Message):
@@ -364,11 +370,6 @@ async def check_subscription_handler(callback_query: types.CallbackQuery):
         await show_menu(msg)  # Передаём объект сообщения
     else:
         await callback_query.answer("Пожалуйста, подпишитесь на каналы, чтобы бот работал.", show_alert=True)
-
-@dp.message_handler(commands=['start'])
-@subscription_required
-async def privetsvie(message: types.Message):
-    await send_message(message, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
 
 
 @dp.message_handler(commands=["video"])
