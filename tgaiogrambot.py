@@ -15,6 +15,7 @@ from datetime import datetime
 import random
 import aiocron
 
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -171,7 +172,7 @@ def subscription_required(handler):
                 InlineKeyboardButton('Mem1no', url='https://t.me/MeminoMem'),
                 InlineKeyboardButton('\u2705 Проверить подписку', callback_data='check_subscription')
             )
-            await message.reply("Please subscribe to the channels first:", reply_markup=markup)
+            await message.reply("Сначало для работы бота требуется подписка на эти каналы.", reply_markup=markup)
     return wrapper
 
 @dp.callback_query_handler(lambda c: c.data == 'check_subscription')
