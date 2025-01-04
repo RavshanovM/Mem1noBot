@@ -14,7 +14,6 @@ from functools import wraps
 from datetime import datetime
 import random
 import aiocron
-from sympy.abc import lamda
 
 # Configure logging
 logging.basicConfig(
