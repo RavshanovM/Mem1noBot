@@ -15,7 +15,6 @@ from datetime import datetime
 import random
 import aiocron
 
-
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -354,20 +353,22 @@ async def handle_menu_selection(message: types.Message):
     elif message.text == '🍀 Узнать уровень удачи':
         await luck(message)
 
-@dp.message_handler(commands=['start'])
-@subscription_required
-async def privetsvie(message: types.Message):
-    await send_message(message, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
-    await show_menu(message)
 
 @dp.callback_query_handler(lambda c: c.data == 'check_subscription')
 async def check_subscription_handler(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
+    msg = callback_query.message  # Объект сообщения
     if await is_subscribed(user_id):
         await callback_query.answer("Вы подписаны!", show_alert=True)
-        await privetsvie(callback_query.message)
+        await send_message(msg, 'Теперь вы можете использовать бота\nЕсть два способа использования бота\nПервый способ через "меню" которое находится рядом с кнопками отправки сообщения\nВторой способ через такие команды как /menu, /video, /memes и т.д.')
+        await show_menu(msg)  # Передаём объект сообщения
     else:
-        await callback_query.answer("Пожалуйста что б бот работал подпишитесь на каналы.", show_alert=True)
+        await callback_query.answer("Пожалуйста, подпишитесь на каналы, чтобы бот работал.", show_alert=True)
+
+@dp.message_handler(commands=['start'])
+@subscription_required
+async def privetsvie(message: types.Message):
+    await send_message(message, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
 
 
 @dp.message_handler(commands=["video"])
