@@ -168,21 +168,14 @@ def subscription_required(handler):
             return await handler(message, *args, **kwargs)
         else:
             markup = InlineKeyboardMarkup()
-            markup.add(
-                InlineKeyboardButton('Mem1no', url='https://t.me/MeminoMem'),
+            markup.row(
+                InlineKeyboardButton('Mem1no', url='https://t.me/MeminoMem'))
+            markup.row(
                 InlineKeyboardButton('\u2705 Проверить подписку', callback_data='check_subscription')
             )
             await message.reply("Сначало для работы бота требуется подписка на эти каналы.", reply_markup=markup)
     return wrapper
 
-@dp.callback_query_handler(lambda c: c.data == 'check_subscription')
-async def check_subscription_handler(callback_query: types.CallbackQuery):
-    user_id = callback_query.from_user.id
-    if await is_subscribed(user_id):
-        await callback_query.answer("Вы подписаны!", show_alert=True)
-        await privetsvie(callback_query.message)
-    else:
-        await callback_query.answer("Пожалуйста что б бот работал подпишитесь на каналы.", show_alert=True)
 
 
 async def send_content(message: types.Message, content_type: str, table_name: str, uid: int = None, source: str = "command"):
@@ -366,6 +359,15 @@ async def handle_menu_selection(message: types.Message):
 async def privetsvie(message: types.Message):
     await send_message(message, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
     await show_menu(message)
+
+@dp.callback_query_handler(lambda c: c.data == 'check_subscription')
+async def check_subscription_handler(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    if await is_subscribed(user_id):
+        await callback_query.answer("Вы подписаны!", show_alert=True)
+        await privetsvie(callback_query.message)
+    else:
+        await callback_query.answer("Пожалуйста что б бот работал подпишитесь на каналы.", show_alert=True)
 
 
 @dp.message_handler(commands=["video"])
