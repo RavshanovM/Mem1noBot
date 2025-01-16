@@ -182,74 +182,131 @@ async def send_content(message: types.Message, content_type: str, table_name: st
     today = datetime.now().date()  # Текущая дата
     try:
         async with db_pool.acquire() as conn:
+            if user_id not in ALLOWED_USERS:
             # Проверяем, сколько раз пользователь уже получил данный тип контента сегодня
-            daily_count = await conn.fetchval("""
-                SELECT COUNT(*) FROM user_content
-                WHERE user_id = $1 AND content_type = $2 AND source = $3 AND DATE(created_at) = $4
-            """, user_id, content_type, source, today)
+                daily_count = await conn.fetchval("""
+                    SELECT COUNT(*) FROM user_content
+                    WHERE user_id = $1 AND content_type = $2 AND source = $3 AND DATE(created_at) = $4
+                """, user_id, content_type, source, today)
 
-            if daily_count >= 15:
-                await message.reply(f"Вы достигли дневного лимита в 15 {content_type} за сегодня. Попробуйте завтра.")
-                return
+                if daily_count >= 15:
+                    await message.reply(f"Вы достигли дневного лимита в 15 {content_type} за сегодня. Попробуйте завтра.")
+                    return
 
-            # Выбор контента
-            if uid is not None:
-                result = await conn.fetchrow(f"""
-                    SELECT {content_type}_id FROM {table_name} WHERE id = $1
-                """, uid)
-            else:
-                result = await conn.fetchrow(f"""
-                    SELECT v.id, v.{content_type}_id FROM {table_name} v
-                    LEFT JOIN user_content uc 
-                    ON v.{content_type}_id = uc.content_id 
-                    AND uc.user_id = $1 
-                    AND uc.content_type = $2
-                    AND uc.source = $3
-                    WHERE uc.content_id IS NULL
-                    ORDER BY RANDOM() LIMIT 1
-                """, user_id, content_type, source)
+                # Выбор контента
+                if uid is not None:
+                    result = await conn.fetchrow(f"""
+                        SELECT {content_type}_id FROM {table_name} WHERE id = $1
+                    """, uid)
+                else:
+                    result = await conn.fetchrow(f"""
+                        SELECT v.id, v.{content_type}_id FROM {table_name} v
+                        LEFT JOIN user_content uc 
+                        ON v.{content_type}_id = uc.content_id 
+                        AND uc.user_id = $1 
+                        AND uc.content_type = $2
+                        AND uc.source = $3
+                        WHERE uc.content_id IS NULL
+                        ORDER BY RANDOM() LIMIT 1
+                    """, user_id, content_type, source)
 
-            if result:
-                content_id = result[f"{content_type}_id"]
-                uid = uid or result["id"]
+                if result:
+                    content_id = result[f"{content_type}_id"]
+                    uid = uid or result["id"]
 
                 # Получение лайков/дизлайков
-                feedback = await conn.fetchrow("""
-                    SELECT likes, dislikes FROM content_feedback
-                    WHERE content_id = $1 AND content_type = $2
-                """, content_id, content_type)
+                    feedback = await conn.fetchrow("""
+                        SELECT likes, dislikes FROM content_feedback
+                        WHERE content_id = $1 AND content_type = $2
+                    """, content_id, content_type)
 
-                likes = feedback['likes'] if feedback else 0
-                dislikes = feedback['dislikes'] if feedback else 0
+                    likes = feedback['likes'] if feedback else 0
+                    dislikes = feedback['dislikes'] if feedback else 0
 
                 # Создаём клавиатуру
-                keyboard = InlineKeyboardMarkup()
-                keyboard.row(
-                    InlineKeyboardButton(f"👍 {likes}", callback_data=f"like_{content_type}_{uid}"),
-                    InlineKeyboardButton(f"👎 {dislikes}", callback_data=f"dislike_{content_type}_{uid}")
-                )
+                    keyboard = InlineKeyboardMarkup()
+                    keyboard.row(
+                        InlineKeyboardButton(f"👍 {likes}", callback_data=f"like_{content_type}_{uid}"),
+                        InlineKeyboardButton(f"👎 {dislikes}", callback_data=f"dislike_{content_type}_{uid}")
+                    )
 
-                keyboard.add(InlineKeyboardButton("➡️ Следующее", callback_data=f"next_{content_type}"))
+                    keyboard.add(InlineKeyboardButton("➡️ Следующее", callback_data=f"next_{content_type}"))
 
                 # Отправляем контент
-                if content_type == "video":
-                    await bot.send_video(message.chat.id, content_id, reply_markup=keyboard)
-                elif content_type == "meme":
-                    await bot.send_photo(message.chat.id, content_id, reply_markup=keyboard)
-                elif content_type == "sticker":
-                    await bot.send_sticker(message.chat.id, content_id, reply_markup=keyboard)
-                elif content_type == "voice":
-                    await bot.send_voice(message.chat.id, content_id, reply_markup=keyboard)
+                    if content_type == "video":
+                        await bot.send_video(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "meme":
+                        await bot.send_photo(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "sticker":
+                        await bot.send_sticker(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "voice":
+                        await bot.send_voice(message.chat.id, content_id, reply_markup=keyboard)
 
                 # Сохраняем просмотр контента
-                await conn.execute("""
-                    INSERT INTO user_content (user_id, content_id, content_type, source, created_at)
-                    VALUES ($1, $2, $3, $4, NOW())
-                    ON CONFLICT DO NOTHING
-                """, user_id, content_id, content_type, source)
+                    await conn.execute("""
+                        INSERT INTO user_content (user_id, content_id, content_type, source, created_at)
+                        VALUES ($1, $2, $3, $4, NOW())
+                        ON CONFLICT DO NOTHING
+                    """, user_id, content_id, content_type, source)
+                else:
+                    await message.reply(f"No available {content_type} to send.")
             else:
-                await message.reply(f"No available {content_type} to send.")
+                if uid is not None:
+                    result = await conn.fetchrow(f"""
+                        SELECT {content_type}_id FROM {table_name} WHERE id = $1
+                    """, uid)
+                else:
+                    result = await conn.fetchrow(f"""
+                        SELECT v.id, v.{content_type}_id FROM {table_name} v
+                        LEFT JOIN user_content uc 
+                        ON v.{content_type}_id = uc.content_id 
+                        AND uc.user_id = $1 
+                        AND uc.content_type = $2
+                        AND uc.source = $3
+                        WHERE uc.content_id IS NULL
+                        ORDER BY RANDOM() LIMIT 1
+                    """, user_id, content_type, source)
 
+                if result:
+                    content_id = result[f"{content_type}_id"]
+                    uid = uid or result["id"]
+
+                # Получение лайков/дизлайков
+                    feedback = await conn.fetchrow("""
+                        SELECT likes, dislikes FROM content_feedback
+                        WHERE content_id = $1 AND content_type = $2
+                    """, content_id, content_type)
+
+                    likes = feedback['likes'] if feedback else 0
+                    dislikes = feedback['dislikes'] if feedback else 0
+
+                # Создаём клавиатуру
+                    keyboard = InlineKeyboardMarkup()
+                    keyboard.row(
+                        InlineKeyboardButton(f"👍 {likes}", callback_data=f"like_{content_type}_{uid}"),
+                        InlineKeyboardButton(f"👎 {dislikes}", callback_data=f"dislike_{content_type}_{uid}")
+                    )
+
+                    keyboard.add(InlineKeyboardButton("➡️ Следующее", callback_data=f"next_{content_type}"))
+
+                # Отправляем контент
+                    if content_type == "video":
+                        await bot.send_video(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "meme":
+                        await bot.send_photo(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "sticker":
+                        await bot.send_sticker(message.chat.id, content_id, reply_markup=keyboard)
+                    elif content_type == "voice":
+                        await bot.send_voice(message.chat.id, content_id, reply_markup=keyboard)
+
+                # Сохраняем просмотр контента
+                    await conn.execute("""
+                        INSERT INTO user_content (user_id, content_id, content_type, source, created_at)
+                        VALUES ($1, $2, $3, $4, NOW())
+                        ON CONFLICT DO NOTHING
+                    """, user_id, content_id, content_type, source)
+                else:
+                    await message.reply(f"No available {content_type} to send.")
     except Exception as e:
         logger.error(f"Error getting {content_type}: {e}")
         await message.reply(f"Error retrieving {content_type}: {e}")
@@ -575,6 +632,52 @@ async def delete_all_videos(message: types.Message):
         logger.error(f"Ошибка при удалении видео: {e}")
         await message.reply(f"Не удалось удалить видео: {e}")
 
+@dp.message_handler(commands=['delete_all_memes'])
+async def delete_all_memes(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await message.reply("У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM memes")
+        await message.reply("Все мемы успешно удалены из базы данных.")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении мемов: {e}")
+        await message.reply(f"Не удалось удалить мемы: {e}")
+
+@dp.message_handler(commands=['delete_all_stickers'])
+async def delete_all_stickers(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await message.reply("У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM stickers")
+        await message.reply("Все стикеры успешно удалены из базы данных.")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении стикеров: {e}")
+        await message.reply(f"Не удалось удалить стикеры: {e}")
+
+@dp.message_handler(commands=['delete_all_voice'])
+async def delete_all_voice(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await message.reply("У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM voice_messages")
+        await message.reply("Все голосовые сообщения успешно удалены из базы данных.")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении голосовых сообщений: {e}")
+        await message.reply(f"Не удалось удалить голосовые сообщения: {e}")
+
+
 
 @dp.message_handler(commands=['get_all_video_ids'])
 async def get_all_video_ids(message: types.Message):
@@ -587,8 +690,8 @@ async def get_all_video_ids(message: types.Message):
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT video_id FROM videos")
             if rows:
-                video_ids = "\n".join(row["video_id"] for row in rows)
-                await message.reply(f"Сохраненные видео ID:\n{video_ids}")
+                video_ids = [row["video_id"] for row in rows]
+                await send_in_chunks(message, "Сохраненные видео ID:\n", video_ids)
             else:
                 await message.reply("База данных не содержит видео.")
     except Exception as e:
@@ -606,8 +709,8 @@ async def get_all_memes_ids(message: types.Message):
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT meme_id FROM memes")
             if rows:
-                meme_ids = "\n".join(row["meme_id"] for row in rows)
-                await message.reply(f"Сохраненные мемы ID:\n{meme_ids}")
+                meme_ids = [row["meme_id"] for row in rows]
+                await send_in_chunks(message, "Сохраненные мемы ID:\n", meme_ids)
             else:
                 await message.reply("База данных не содержит мемов.")
     except Exception as e:
@@ -625,8 +728,8 @@ async def get_all_stickers_ids(message: types.Message):
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT sticker_id FROM stickers")
             if rows:
-                sticker_ids = "\n".join(row["sticker_id"] for row in rows)
-                await message.reply(f"Сохраненные стикеры ID:\n{sticker_ids}")
+                sticker_ids = [row["sticker_id"] for row in rows]
+                await send_in_chunks(message, "Сохраненные стикеры ID:\n", sticker_ids)
             else:
                 await message.reply("База данных не содержит стикеров.")
     except Exception as e:
@@ -644,13 +747,23 @@ async def get_all_voice_ids(message: types.Message):
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT voice_id FROM voice_messages")
             if rows:
-                voice_ids = "\n".join(row["voice_id"] for row in rows)
-                await message.reply(f"Сохраненные стикеры ID:\n{voice_ids}")
+                voice_ids = [row["voice_id"] for row in rows]
+                await send_in_chunks(message, "Сохраненные голосовые сообщения ID:\n", voice_ids)
             else:
                 await message.reply("База данных не содержит голосовух.")
     except Exception as e:
         logger.error(f"Ошибка при получении ID голоса: {e}")
         await message.reply(f"Не удалось получить ID голосового: {e}")
+
+async def send_in_chunks(message, prefix, data, chunk_size=4096):
+    message_chunk = prefix
+    for item in data:
+        if len(message_chunk) + len(item) + 1 > chunk_size:
+            await message.reply(message_chunk)
+            message_chunk = ""
+        message_chunk += f"{item}\n"
+    if message_chunk:
+        await message.reply(message_chunk)
 
 class BroadcastState(StatesGroup):
     broadcasting = State()
@@ -667,6 +780,7 @@ async def register_user(message: types.Message):
         """, user_id, username)
     await message.reply("Вы зарегистрированы!")
 
+
 @dp.message_handler(commands=['otpravka'])
 async def start_broadcast(message: types.Message):
     if message.from_user.id not in ALLOWED_USERS:
@@ -677,24 +791,58 @@ async def start_broadcast(message: types.Message):
                         "Когда захотите завершить рассылку, напишите `/stop`.")
     await BroadcastState.broadcasting.set()
 
+
 @dp.message_handler(state=BroadcastState.broadcasting, commands=['stop'])
 async def stop_broadcasting(message: types.Message, state: FSMContext):
     await message.reply("Режим рассылки завершён.")
     await state.finish()
 
-@dp.message_handler(state=BroadcastState.broadcasting)
+
+@dp.message_handler(state=BroadcastState.broadcasting, content_types=types.ContentType.ANY)
 async def broadcast_message(message: types.Message, state: FSMContext):
     async with db_pool.acquire() as conn:
         users = await conn.fetch("SELECT user_id FROM bot_users")
         count = 0
         for user in users:
             try:
-                await bot.copy_message(chat_id=user['user_id'], from_chat_id=message.chat.id, message_id=message.message_id)
+                # Проверяем тип содержимого сообщения
+                if message.content_type == 'text':
+                    await bot.send_message(chat_id=user['user_id'], text=message.text)
+
+                elif message.content_type == 'photo':
+                    await bot.send_photo(chat_id=user['user_id'], photo=message.photo[-1].file_id,
+                                         caption=message.caption)
+
+                elif message.content_type == 'video':
+                    await bot.send_video(chat_id=user['user_id'], video=message.video.file_id, caption=message.caption)
+
+                elif message.content_type == 'animation':
+                    await bot.send_animation(chat_id=user['user_id'], animation=message.animation.file_id,
+                                             caption=message.caption)
+
+                elif message.content_type == 'document':
+                    await bot.send_document(chat_id=user['user_id'], document=message.document.file_id,
+                                            caption=message.caption)
+
+                elif message.content_type == 'audio':
+                    await bot.send_audio(chat_id=user['user_id'], audio=message.audio.file_id, caption=message.caption)
+
+                elif message.content_type == 'voice':
+                    await bot.send_voice(chat_id=user['user_id'], voice=message.voice.file_id, caption=message.caption)
+
+                elif message.content_type == 'sticker':
+                    await bot.send_sticker(chat_id=user['user_id'], sticker=message.sticker.file_id)
+
+                else:
+                    await bot.send_message(chat_id=user['user_id'], text="Этот тип сообщения не поддерживается.")
+
                 count += 1
+
             except Exception as e:
                 logging.error(f"Failed to send message to {user['user_id']}: {e}")
 
     await message.reply(f"Сообщение успешно отправлено {count} пользователям.")
+
 
 @aiocron.crontab('0 12 * * *')  # Каждый день в 12:00
 async def scheduled_daily_video():
@@ -702,27 +850,18 @@ async def scheduled_daily_video():
         users = await conn.fetch("SELECT user_id FROM bot_users")
         for user in users:
             try:
-                # Создаём фейковое сообщение для вызова handle_video_command
-                class FakeMessage:
-                    def __init__(self, user_id):
-                        self.from_user = types.User(id=user_id, is_bot=False, first_name="User")
-                        self.chat = types.Chat(id=user_id, type="private")
-                        self.text = "/video"
-                        self.get_args = lambda: ""  # Без аргументов
-
-                fake_message = FakeMessage(user['user_id'])
-                await handle_video_command(fake_message)
+                # Отправляем команду /video от имени бота
+                await dp.bot.send_message(chat_id=user['user_id'], text="/video")
             except Exception as e:
-                logger.error(f"Error sending daily video to user {user['user_id']}: {e}")
+                logger.error(f"Ошибка при отправке ежедневного видео пользователю {user['user_id']}: {e}")
 
-from aiocron import crontab
 
 async def main():
     # Инициализация базы данных
     await init_db_pool()
     await create_tables()
     await update_tables()
-    crontab('0 12 * * *')(scheduled_daily_video)
+    aiocron.crontab('0 12 * * *')(scheduled_daily_video)
     # Запуск бота
     try:
         await dp.start_polling()
