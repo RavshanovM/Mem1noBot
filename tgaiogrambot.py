@@ -855,6 +855,37 @@ async def scheduled_daily_video():
             except Exception as e:
                 logger.error(f"Ошибка при отправке ежедневного видео пользователю {user['user_id']}: {e}")
 
+@dp.message_handler(commands=['content_count'])
+async def content_count(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await message.reply("У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            # Подсчёт видео
+            video_count = await conn.fetchval("SELECT COUNT(*) FROM videos")
+            # Подсчёт мемов
+            meme_count = await conn.fetchval("SELECT COUNT(*) FROM memes")
+            # Подсчёт стикеров
+            sticker_count = await conn.fetchval("SELECT COUNT(*) FROM stickers")
+            # Подсчёт голосовых
+            voice_count = await conn.fetchval("SELECT COUNT(*) FROM voice_messages")
+
+        # Формируем ответ
+        response = (
+            f"📊 **Статистика контента:**\n"
+            f"🎥 Видео: {video_count or 0}\n"
+            f"🖼️ Мемы: {meme_count or 0}\n"
+            f"🖼️ Стикеры: {sticker_count or 0}\n"
+            f"🎙️ Голосовые: {voice_count or 0}"
+        )
+        await message.reply(response, parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Ошибка при подсчёте контента: {e}")
+        await message.reply(f"Не удалось получить статистику: {e}")
+
 
 async def main():
     # Инициализация базы данных
