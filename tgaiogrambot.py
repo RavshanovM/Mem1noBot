@@ -31,7 +31,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not BOT_TOKEN or not DATABASE_URL:
     raise ValueError("BOT_TOKEN and DATABASE_URL must be set in environment variables")
 
-ALLOWED_USERS = [2041928302, 6635421234]
+ALLOWED_USERS = [2041928302, 6635421234, 6137303580]
 PUBLIC_CHANNELS = ["@MeminoMem"]
 user_luck = {}
 otp_video = {}
@@ -40,9 +40,11 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 db_pool = None
 
+
 # Utility Functions
 async def send_message(chat_id, text):
     await bot.send_message(chat_id=chat_id, text=text)
+
 
 # Database Initialization
 async def init_db_pool():
@@ -58,6 +60,7 @@ async def init_db_pool():
             if attempt == retries - 1:
                 raise e
 
+
 async def close_db_pool():
     global db_pool
     if db_pool:
@@ -66,6 +69,7 @@ async def close_db_pool():
         logger.info("Database connection pool closed.")
     else:
         logger.warning("Database pool was not initialized, nothing to close.")
+
 
 async def create_tables():
     if not db_pool:
@@ -123,6 +127,7 @@ async def create_tables():
         except Exception as e:
             logger.error(f"Error creating tables: {e}")
 
+
 async def update_tables():
     if not db_pool:
         logger.error("Database pool is not initialized.")
@@ -159,6 +164,8 @@ async def is_subscribed(user_id: int) -> bool:
             logger.error(f"Error checking channel {channel}: {e}")
             return False
     return True
+
+
 def subscription_required(handler):
     @wraps(handler)
     async def wrapper(message: types.Message, *args, **kwargs):
@@ -173,11 +180,12 @@ def subscription_required(handler):
                 InlineKeyboardButton('\u2705 Проверить подписку', callback_data='check_subscription')
             )
             await message.reply("Сначало для работы бота требуется подписка на эти каналы.", reply_markup=markup)
+
     return wrapper
 
 
-
-async def send_content(message: types.Message, content_type: str, table_name: str, uid: int = None, source: str = "command"):
+async def send_content(message: types.Message, content_type: str, table_name: str, uid: int = None,
+                       source: str = "command"):
     user_id = message.from_user.id
     today = datetime.now().date()  # Текущая дата
 
@@ -192,7 +200,8 @@ async def send_content(message: types.Message, content_type: str, table_name: st
                 """, user_id, content_type, source, today)
 
                 if daily_count >= 15:
-                    await message.reply(f"Вы достигли дневного лимита в 15 {content_type} за сегодня. Попробуйте завтра.")
+                    await message.reply(
+                        f"Вы достигли дневного лимита в 15 {content_type} за сегодня. Попробуйте завтра.")
                     return
 
             # Выбор контента
@@ -257,13 +266,16 @@ async def send_content(message: types.Message, content_type: str, table_name: st
         logger.error(f"Error getting {content_type}: {e}")
         await message.reply(f"Error retrieving {content_type}: {e}")
 
+
 # Инициализация MemoryStorage
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
+
 # Определение состояний
 class AddContentState(StatesGroup):
     waiting_for_content = State()
+
 
 # Команда для начала добавления контента
 @dp.message_handler(commands=['addvideo', 'addmeme', 'addsticker', 'addvoice'])
@@ -282,6 +294,7 @@ async def start_adding_content(message: types.Message, state: FSMContext):
     await AddContentState.waiting_for_content.set()
 
     await message.reply(f"Отправьте {content_type}, чтобы я его сохранил.")
+
 
 # Обработчик для получения контента
 @dp.message_handler(state=AddContentState.waiting_for_content, content_types=types.ContentTypes.ANY)
@@ -324,6 +337,7 @@ async def add_content(message: types.Message, state: FSMContext):
     # Завершаем состояние
     await state.finish()
 
+
 @dp.message_handler(commands=['menu'])
 @subscription_required
 async def show_menu(message: types.Message):
@@ -342,14 +356,16 @@ async def show_menu(message: types.Message):
     )
     await message.reply("Выберите категорию:", reply_markup=menu_keyboard)
 
+
 @dp.message_handler(commands=['start'])
 @subscription_required
 async def privetsvie(message: types.Message):
-    await bot.send_message(message.chat.id, 'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
+    await bot.send_message(message.chat.id,
+                           'Приветствую вас в нашем боте!\nБот умеет присылать вам прикольные видео, мемы, стикеры, смешные голосовые сообщение)\nПриятного пользования нашим ботом!\nУдачи!!!')
 
 
-
-@dp.message_handler(lambda message: message.text in ['🎥 Видео', '🖼️ Мемы', '📦 Стикеры', '🎙️ Голосовухи', '🍀 Узнать уровень удачи'])
+@dp.message_handler(
+    lambda message: message.text in ['🎥 Видео', '🖼️ Мемы', '📦 Стикеры', '🎙️ Голосовухи', '🍀 Узнать уровень удачи'])
 async def handle_menu_selection(message: types.Message):
     if message.text == '🎥 Видео':
         await handle_video_command(message)
@@ -369,10 +385,19 @@ async def check_subscription_handler(callback_query: types.CallbackQuery):
     msg = callback_query.message  # Объект сообщения
     if await is_subscribed(user_id):
         await callback_query.answer("Вы подписаны!", show_alert=True)
-        await send_message(msg, 'Теперь вы можете использовать бота\nЕсть два способа использования бота\nПервый способ через "меню" которое находится рядом с кнопками отправки сообщения\nВторой способ через такие команды как /menu, /video, /memes и т.д.')
+
+        # Удаление сообщения
+        await msg.delete()
+
+        await send_message(
+            msg,
+            'Теперь вы можете использовать бота\nЕсть два способа использования бота\nПервый способ через "меню" которое находится рядом с кнопками отправки сообщения\nВторой способ через такие команды как /menu, /video, /memes и т.д.'
+        )
         await show_menu(msg)  # Передаём объект сообщения
     else:
-        await callback_query.answer("Пожалуйста, подпишитесь на каналы, чтобы бот работал.", show_alert=True)
+        await callback_query.answer(
+            "Пожалуйста, подпишитесь на каналы, чтобы бот работал.", show_alert=True
+        )
 
 
 @dp.message_handler(commands=["video"])
@@ -382,12 +407,14 @@ async def handle_video_command(message: types.Message):
     uid = int(args) if args and args.isdigit() else None
     await send_content(message, "video", "videos", uid, "command")
 
+
 @dp.message_handler(commands=['memes'])
 @subscription_required
 async def handle_memes_command(message: types.Message):
     args = message.get_args()
     uid = int(args) if args and args.isdigit() else None
     await send_content(message, "meme", "memes", uid, "command")
+
 
 @dp.message_handler(commands=['stickers', 's'])
 @subscription_required
@@ -396,12 +423,14 @@ async def handle_sticker(message: types.Message):
     uid = int(args) if args and args.isdigit() else None
     await send_content(message, "sticker", "stickers", uid, "command")
 
+
 @dp.message_handler(commands=['voice', 'vo'])
 @subscription_required
 async def handle_voice(message: types.Message):
     args = message.get_args()
     uid = int(args) if args and args.isdigit() else None
     await send_content(message, "voice", "voice_messages", uid, "command")
+
 
 @dp.message_handler(commands=['luck'])
 @subscription_required
@@ -556,21 +585,21 @@ async def handle_callback_query(callback_query: types.CallbackQuery):
     data = callback_query.data.split('_')
     action = data[0]  # like, dislike, next
     content_type = data[1]
-        
+
     if action == 'next':
         table_map = {
-        "video": "videos",
-        "meme": "memes",
-        "sticker": "stickers",
-        "voice": "voice_messages"
+            "video": "videos",
+            "meme": "memes",
+            "sticker": "stickers",
+            "voice": "voice_messages"
         }
         table_name = table_map.get(content_type)
 
         if table_name:
-            await send_content(callback_query.message, content_type=content_type, table_name=table_name, source="callback")
+            await send_content(callback_query.message, content_type=content_type, table_name=table_name,
+                               source="callback")
         else:
             await callback_query.answer("Unknown content type.", show_alert=True)
-
 
 
 @dp.message_handler(commands=['delete_all_videos'])
@@ -588,6 +617,7 @@ async def delete_all_videos(message: types.Message):
         logger.error(f"Ошибка при удалении видео: {e}")
         await message.reply(f"Не удалось удалить видео: {e}")
 
+
 @dp.message_handler(commands=['delete_all_memes'])
 async def delete_all_memes(message: types.Message):
     user_id = message.from_user.id
@@ -602,6 +632,7 @@ async def delete_all_memes(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при удалении мемов: {e}")
         await message.reply(f"Не удалось удалить мемы: {e}")
+
 
 @dp.message_handler(commands=['delete_all_stickers'])
 async def delete_all_stickers(message: types.Message):
@@ -618,6 +649,7 @@ async def delete_all_stickers(message: types.Message):
         logger.error(f"Ошибка при удалении стикеров: {e}")
         await message.reply(f"Не удалось удалить стикеры: {e}")
 
+
 @dp.message_handler(commands=['delete_all_voice'])
 async def delete_all_voice(message: types.Message):
     user_id = message.from_user.id
@@ -632,7 +664,6 @@ async def delete_all_voice(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при удалении голосовых сообщений: {e}")
         await message.reply(f"Не удалось удалить голосовые сообщения: {e}")
-
 
 
 @dp.message_handler(commands=['get_all_video_ids'])
@@ -654,6 +685,7 @@ async def get_all_video_ids(message: types.Message):
         logger.error(f"Ошибка при получении ID видео: {e}")
         await message.reply(f"Не удалось получить ID видео: {e}")
 
+
 @dp.message_handler(commands=['get_all_memes_ids'])
 async def get_all_memes_ids(message: types.Message):
     user_id = message.from_user.id
@@ -672,6 +704,7 @@ async def get_all_memes_ids(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка при получении ID мема: {e}")
         await message.reply(f"Не удалось получить ID мемов: {e}")
+
 
 @dp.message_handler(commands=['get_all_stickers_ids'])
 async def get_all_stickers_ids(message: types.Message):
@@ -692,6 +725,7 @@ async def get_all_stickers_ids(message: types.Message):
         logger.error(f"Ошибка при получении ID стикера: {e}")
         await message.reply(f"Не удалось получить ID стикеров: {e}")
 
+
 @dp.message_handler(commands=['get_all_voice_ids'])
 async def get_all_voice_ids(message: types.Message):
     user_id = message.from_user.id
@@ -711,6 +745,7 @@ async def get_all_voice_ids(message: types.Message):
         logger.error(f"Ошибка при получении ID голоса: {e}")
         await message.reply(f"Не удалось получить ID голосового: {e}")
 
+
 async def send_in_chunks(message, prefix, data, chunk_size=4096):
     message_chunk = prefix
     for item in data:
@@ -721,8 +756,10 @@ async def send_in_chunks(message, prefix, data, chunk_size=4096):
     if message_chunk:
         await message.reply(message_chunk)
 
+
 class BroadcastState(StatesGroup):
     broadcasting = State()
+
 
 @dp.message_handler(commands=['start'])
 async def register_user(message: types.Message):
@@ -811,6 +848,7 @@ async def scheduled_daily_video():
             except Exception as e:
                 logger.error(f"Ошибка при отправке ежедневного видео пользователю {user['user_id']}: {e}")
 
+
 @dp.message_handler(commands=['content_count'])
 async def content_count(message: types.Message):
     user_id = message.from_user.id
@@ -854,6 +892,7 @@ async def main():
         await dp.start_polling()
     finally:
         await close_db_pool()
+
 
 if __name__ == '__main__':
     # Запуск основного цикла событий
