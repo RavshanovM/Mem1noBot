@@ -556,14 +556,20 @@ async def handle_callback_query(callback_query: types.CallbackQuery):
     data = callback_query.data.split('_')
     action = data[0]  # like, dislike, next
     content_type = data[1]
-    if content_type =='voice'
-        content_type = 'voice_message'# video, meme, voice
-    else:
-        continue
         
     if action == 'next':
-        await send_content(callback_query.message, content_type, f"{content_type}s")
-        await callback_query.answer()
+        table_map = {
+        "video": "videos",
+        "meme": "memes",
+        "sticker": "stickers",
+        "voice": "voice_messages"
+        }
+        table_name = table_map.get(content_type)
+
+        if table_name:
+            await send_content(callback_query.message, content_type=content_type, table_name=table_name, source="callback")
+        else:
+            await callback_query.answer("Unknown content type.", show_alert=True)
 
 
 
