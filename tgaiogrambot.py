@@ -14,6 +14,7 @@ from functools import wraps
 from datetime import datetime
 import random
 import aiocron
+from humanfriendly.terminal import message
 
 # Configure logging
 logging.basicConfig(
@@ -32,6 +33,7 @@ if not BOT_TOKEN or not DATABASE_URL:
     raise ValueError("BOT_TOKEN and DATABASE_URL must be set in environment variables")
 
 ALLOWED_USERS = [2041928302, 6635421234, 6137303580]
+glava = [2041928302]
 PUBLIC_CHANNELS = ["@MeminoMem"]
 user_luck = {}
 otp_video = {}
@@ -161,11 +163,11 @@ async def is_subscribed(user_id: int) -> bool:
             if status.status not in ["member", "administrator", "creator"]:
                 return False
         except Exception as e:
-            logger.error(f"Error checking channel {channel}: {e}")
+            print(f"Error checking channel {channel}: {e}")
             return False
     return True
 
-
+# Декоратор для проверки подписки
 def subscription_required(handler):
     @wraps(handler)
     async def wrapper(message: types.Message, *args, **kwargs):
@@ -173,14 +175,15 @@ def subscription_required(handler):
         if await is_subscribed(user_id):
             return await handler(message, *args, **kwargs)
         else:
+            # Динамическое создание кнопок для каждого канала
             markup = InlineKeyboardMarkup()
-            markup.row(
-                InlineKeyboardButton('Mem1no', url='https://t.me/MeminoMem'))
+            for channel in PUBLIC_CHANNELS:
+                channel_link = f"https://t.me/{channel.lstrip('@')}"
+                markup.row(InlineKeyboardButton(channel, url=channel_link))
             markup.row(
                 InlineKeyboardButton('\u2705 Проверить подписку', callback_data='check_subscription')
             )
-            await message.reply("Сначало для работы бота требуется подписка на эти каналы.", reply_markup=markup)
-
+            await message.reply("Для работы бота требуется подписка на эти каналы:", reply_markup=markup)
     return wrapper
 
 
@@ -337,6 +340,108 @@ async def add_content(message: types.Message, state: FSMContext):
     # Завершаем состояние
     await state.finish()
 
+@dp.message_handler(commands=['dobro'])
+async def dobavit_admina(message: types.Message):
+    user_id = message.from_user.id
+    global ALLOWED_USERS
+    if user_id not in glava:
+        await send_message(message.chat.id, 'У вас нет прав для этой команды')
+        return
+    try:
+        user_input = message.text.split(maxsplit=1)[1]
+        ID_POLZOVATELYA = int(user_input)
+        if ID_POLZOVATELYA not in ALLOWED_USERS:
+            ALLOWED_USERS.append(ID_POLZOVATELYA)
+            await send_message(message.chat.id, 'ID добавлен в бота как админ')
+        else:
+            await send_message(message.chat.id, 'Так он ж и так админ че хочешь')
+    except(IndexError, ValueError):
+        # Ошибка, если пользователь не ввёл число или текст некорректен
+        await message.reply("Пожалуйста, введите число после команды. Пример: /dobro 123")
+
+@dp.message_handler(commands=['pshlnx'])
+async def dinax(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in glava:
+        await send_message(message.chat.id, 'Пошел нах отсюда')
+        return
+
+    try:
+        global ALLOWED_USERS
+        user_input = message.text.split(maxsplit=1)[1]
+        ID_POLZOVATELYA = int(user_input)
+        ALLOWED_USERS.remove(ID_POLZOVATELYA)
+        await send_message(message.chat.id, 'Ура! теперь стало меньше на одного чупиздрика в админах')
+    except(IndexError, ValueError):
+        # Ошибка, если пользователь не ввёл число или текст некорректен
+        await message.reply("Пожалуйста, введите число после команды. Пример: /pshlnx 123")
+
+@dp.message_handler(commands=['spisok_ebanko'])
+async def spisok_ebanko(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await send_message(message.chat.id, 'Ты слишком слаю для этой команды')
+        return
+
+    await send_message(message.chat.id, f'вот список который ты так хочешь {ALLOWED_USERS}')
+
+@dp.message_handler(commands=['add_channel'])
+async def add_channel_command(message: types.Message):
+    user_id = message.from_user.id
+    global PUBLIC_CHANNELS
+    if user_id not in ALLOWED_USERS:
+        await message.reply("Че ты хочешь добавить канал да?\nА фиг тобе,\nТЫ НЕВЛАСТНЫЙ ТУТ!")
+        return
+    try:
+        # Получение имени канала от пользователя
+        channel = message.text.split(maxsplit=1)[1].strip()
+        if not channel.startswith('@'):
+            await message.reply("Название канала должно начинаться с '@'. Пример: /add_channel @example_channel")
+            return
+        if channel in PUBLIC_CHANNELS:
+            await message.reply(f"Канал {channel} уже есть в списке.")
+        else:
+            PUBLIC_CHANNELS.append(channel)
+            await message.reply(f"Канал {channel} добавлен в список проверки.")
+    except IndexError:
+        await message.reply("Пожалуйста, укажите название канала. Пример: /add_channel @example_channel")
+
+
+@dp.message_handler(commands=['minus_channel'])
+async def minus_channel_command(message: types.Message):
+    user_id = message.from_user.id
+    global PUBLIC_CHANNELS
+    if user_id not in ALLOWED_USERS:
+        await message.reply("У вас нет прав, да кто ты такой вообще?")
+        return
+    try:
+        # Получение имени канала от пользователя
+        channel = message.text.split(maxsplit=1)[1].strip()
+        if not channel.startswith('@'):
+            await message.reply("Название канала должно начинаться с '@'. Пример: /minus_channel @example_channel")
+            return
+        if channel in PUBLIC_CHANNELS:
+            PUBLIC_CHANNELS.remove(channel)
+            await message.reply(f"Канал {channel} теперь нет в списке.")
+        else:
+            await message.reply(f"Канал {channel} не было в списке")
+    except IndexError:
+        await message.reply("Пожалуйста, укажите название канала. Пример: /add_channel @example_channel")
+
+# Команда для просмотра списка каналов
+@dp.message_handler(commands=['list_channels'])
+async def list_channels_command(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in ALLOWED_USERS:
+        await message.reply("че за хуйня")
+        return
+    if PUBLIC_CHANNELS:
+        channels = '\n'.join(PUBLIC_CHANNELS)
+        await message.reply(f"Список каналов для проверки:\n{channels}")
+    else:
+        await message.reply("Список каналов пуст.")
+
+
 
 @dp.message_handler(commands=['menu'])
 @subscription_required
@@ -454,42 +559,70 @@ async def luck(message: types.Message):
         user_luck[user_id] = {'luck': average_luck, 'date': today}
 
         # Определяем текст и эмодзи на основе среднего уровня удачи
+        # Определяем текст и эмодзи на основе среднего уровня удачи
         if average_luck <= 22:
             emoji = "\U0001F622"
-            comments = ["Сегодня совсем не повезло. Отдохни и попробуй завтра.",
-                        "Не бери всё близко к сердцу, завтра будет лучше.",
-                        "Кажется, удача сегодня решила взять выходной."]
+            comments = [
+                "Сегодня совсем не повезло. Отдохни и попробуй завтра.",
+                "Не бери всё близко к сердцу, завтра будет лучше.",
+                "Кажется, удача сегодня решила взять выходной.",
+                "Лучше не принимать важных решений. Просто отдохни.",
+                "Тяжёлый день, но это временно. Не сдавайся!"
+            ]
         elif average_luck <= 60:
             emoji = "\U0001F641"
-            comments = ["Не повезло сегодня, но завтра будет лучше!",
-                        "День не самый удачный, но ты справишься.",
-                        "Удача слегка отвернулась, но не сдавайся!"]
+            comments = [
+                "Не самый удачный день, но всё можно исправить.",
+                "День не слишком удачный, но он всё же твой.",
+                "Проблемы приходят и уходят. Завтра будет лучше.",
+                "Будь осторожен, но не теряй надежды.",
+                "Сегодняшний день учит терпению. Это тоже важно!"
+            ]
         elif average_luck <= 100:
             emoji = "\U0001F610"
-            comments = ["Чуть ниже среднего. День может быть сложным.",
-                        "Обычный день, но стоит быть внимательным.",
-                        "Не лучший день, но и не худший."]
+            comments = [
+                "День ниже среднего, но в твоих силах сделать его лучше.",
+                "Не лучший день, но он всё же движется вперёд.",
+                "Иногда просто плыть по течению — лучший выбор.",
+                "Пусть это будет день отдыха и размышлений.",
+                "Не ожидай слишком многого, и ты избежишь разочарований."
+            ]
         elif average_luck <= 140:
             emoji = "\U0001F642"
-            comments = ["Средний уровень удачи. Хороший день для небольших дел.",
-                        "День может пройти спокойно и без сюрпризов.",
-                        "Всё под контролем."]
+            comments = [
+                "Средний уровень удачи. Всё идёт своим чередом.",
+                "Хороший день для небольших достижений.",
+                "Не торопись, и всё получится.",
+                "День пройдёт ровно, наслаждайся этим моментом.",
+                "Идеальное время для планирования и подготовки."
+            ]
         elif average_luck <= 160:
             emoji = "\U0001F603"
-            comments = ["Повезло! День обещает быть приятным.",
-                        "Хороший день для новых начинаний.",
-                        "Возможности на горизонте, не упусти их!"]
+            comments = [
+                "День с хорошим потенциалом. Используй его!",
+                "Удача с тобой, лови момент.",
+                "Прекрасный день для новых идей и проектов.",
+                "Всё получится, главное — верить в себя.",
+                "Ты на правильном пути. Двигайся вперёд!"
+            ]
         elif average_luck <= 190:
             emoji = "\U0001F604"
-            comments = ["Отличная удача сегодня! Воспользуйся этим шансом!",
-                        "Сегодня всё получится, звёзды на твоей стороне.",
-                        "День для свершений, дерзай!"]
+            comments = [
+                "Отличный день для свершений. Всё в твоих руках!",
+                "Ты словно магнит для удачи сегодня!",
+                "Всё, за что ты берёшься, приносит успех.",
+                "Смело берись за сложные задачи — они тебе по плечу.",
+                "Этот день обещает быть незабываемым. Наслаждайся!"
+            ]
         else:
             emoji = "\U0001F60D"
-            comments = ["Ты просто невероятно удачлив сегодня!",
-                        "Сегодня твой день, наслаждайся каждой минутой!",
-                        "Удача сегодня за тобой везде, где бы ты ни был."]
-
+            comments = [
+                "Ты просто невероятно удачлив! Воспользуйся этим шансом.",
+                "Сегодня твой день! Всё складывается идеально.",
+                "Кажется, сама Вселенная работает на тебя.",
+                "Удача улыбается тебе во всём. Не упусти этот момент!",
+                "Ты на вершине мира! Всё получается легко и просто."
+            ]
         comment = random.choice(comments)
         response = f"Сегодня твой средний уровень удачи: {average_luck / 2}% {emoji}\n{comment}"
 
@@ -605,7 +738,7 @@ async def handle_callback_query(callback_query: types.CallbackQuery):
 @dp.message_handler(commands=['delete_all_videos'])
 async def delete_all_videos(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in ALLOWED_USERS:
+    if user_id not in glava:
         await message.reply("У вас нет прав на выполнение этой команды.")
         return
 
@@ -621,7 +754,7 @@ async def delete_all_videos(message: types.Message):
 @dp.message_handler(commands=['delete_all_memes'])
 async def delete_all_memes(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in ALLOWED_USERS:
+    if user_id not in glava:
         await message.reply("У вас нет прав на выполнение этой команды.")
         return
 
@@ -637,7 +770,7 @@ async def delete_all_memes(message: types.Message):
 @dp.message_handler(commands=['delete_all_stickers'])
 async def delete_all_stickers(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in ALLOWED_USERS:
+    if user_id not in glava:
         await message.reply("У вас нет прав на выполнение этой команды.")
         return
 
@@ -653,7 +786,7 @@ async def delete_all_stickers(message: types.Message):
 @dp.message_handler(commands=['delete_all_voice'])
 async def delete_all_voice(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in ALLOWED_USERS:
+    if user_id not in glava:
         await message.reply("У вас нет прав на выполнение этой команды.")
         return
 
