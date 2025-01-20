@@ -14,7 +14,7 @@ from functools import wraps
 from datetime import datetime
 import random
 import aiocron
-from humanfriendly.terminal import message
+
 
 # Configure logging
 logging.basicConfig(
